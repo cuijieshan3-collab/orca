@@ -30,10 +30,13 @@ export function installRendererCrashDiagnostics(surface: RendererSurface = 'main
 
   if (readHeapMetrics()) {
     recordRendererMemorySample('startup')
-    rendererMemoryInterval = window.setInterval(
-      () => recordRendererMemorySample('interval'),
-      RENDERER_MEMORY_SAMPLE_INTERVAL_MS
-    )
+    rendererMemoryInterval = window.setInterval(() => {
+      // Why: OOM trends don't need 1-min resolution while hidden; one sample on resume preserves the highwater arms.
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        return
+      }
+      recordRendererMemorySample('interval')
+    }, RENDERER_MEMORY_SAMPLE_INTERVAL_MS)
   }
 }
 

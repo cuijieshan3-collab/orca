@@ -46,6 +46,10 @@ export function createPanelWatchdog(options: PanelWatchdogOptions): PanelWatchdo
       // A ping is already outstanding; its deadline will fire first.
       return
     }
+    // Why: an "unresponsive" badge on a hidden panel is invisible — detect it on resume before the user can interact.
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+      return
+    }
     awaitedPingId = nextPingId++
     options.sendPing(awaitedPingId)
     const deadlineGeneration = generation

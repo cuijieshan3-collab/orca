@@ -266,7 +266,13 @@ export function startAgentHibernationCoordinator(
   }
   coordinator.now = options.now ?? (() => Date.now())
   const intervalMs = options.intervalMs ?? AGENT_HIBERNATION_TICK_MS
-  coordinator.interval = setInterval(() => void runAgentHibernationTick(), intervalMs)
+  coordinator.interval = setInterval(() => {
+    // Why: hibernation only reclaims memory for a visible session — a hidden window postpones reclaim to the becoming-visible run.
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+      return
+    }
+    void runAgentHibernationTick()
+  }, intervalMs)
   return stopAgentHibernationCoordinator
 }
 
