@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useAppStore } from '@/store'
 import { isDotfileRelativePath } from './file-explorer-entries'
 import type { DirCache, TreeNode } from './file-explorer-types'
@@ -119,7 +119,12 @@ export function createVisibleFileExplorerRowProjection(
  */
 function useContentStableRelativePaths(relativePaths: string[], enabled: boolean): string[] {
   // Why: filters need fresh identities per keystroke and must not evict the tree signature.
+  // Why ref-read-in-render + write-in-effect: render must stay pure (react-doctor), so the
+  // previous array is published after commit — worst case one render loses stability, never stale.
   const prevRef = useRef<string[] | null>(null)
+  useEffect(() => {
+    prevRef.current = relativePaths
+  }, [relativePaths])
   if (!enabled) {
     return relativePaths
   }
@@ -136,7 +141,6 @@ function useContentStableRelativePaths(relativePaths: string[], enabled: boolean
       return prev
     }
   }
-  prevRef.current = relativePaths
   return relativePaths
 }
 
