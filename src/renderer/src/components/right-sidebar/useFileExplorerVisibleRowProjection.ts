@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useRef } from 'react'
 import { useAppStore } from '@/store'
 import { isDotfileRelativePath } from './file-explorer-entries'
 import type { DirCache, TreeNode } from './file-explorer-types'
@@ -119,16 +119,25 @@ export function createVisibleFileExplorerRowProjection(
  */
 function useContentStableRelativePaths(relativePaths: string[], enabled: boolean): string[] {
   // Why: filters need fresh identities per keystroke and must not evict the tree signature.
-  // Why: NUL cannot occur in paths, so the signature can reconstruct the list losslessly.
-  const signature = useMemo(
-    () => (enabled ? relativePaths.join('\u0000') : null),
-    [enabled, relativePaths]
-  )
-  const stableTreePaths = useMemo(
-    () => (signature ? signature.split('\u0000') : EMPTY_RELATIVE_PATHS),
-    [signature]
-  )
-  return enabled ? stableTreePaths : relativePaths
+  const prevRef = useRef<string[] | null>(null)
+  if (!enabled) {
+    return relativePaths
+  }
+  const prev = prevRef.current
+  if (prev && prev.length === relativePaths.length) {
+    let equal = true
+    for (let i = 0; i < prev.length; i++) {
+      if (prev[i] !== relativePaths[i]) {
+        equal = false
+        break
+      }
+    }
+    if (equal) {
+      return prev
+    }
+  }
+  prevRef.current = relativePaths
+  return relativePaths
 }
 
 export function useFileExplorerVisibleRowProjection(
