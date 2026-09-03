@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useMemo, useRef, useState } from 'react'
 import { useAppStore } from '@/store'
 import { getConnectionId } from '@/lib/connection-context'
 import { detectLanguage } from '@/lib/language-detect'
@@ -40,12 +40,11 @@ function EditorPanelInner({
   isCmdSaveOwner?: boolean
   markdownAnnotationsEnabled?: boolean
 } = {}): React.JSX.Element | null {
+  const openFiles = useAppStore((s) => s.openFiles)
   const globalActiveFileId = useAppStore((s) => s.activeFileId)
   const activeFileId = activeFileIdProp ?? globalActiveFileId
   const activeViewStateId = activeViewStateIdProp ?? activeFileId
-  const activeFile = useAppStore((s) =>
-    activeFileId == null ? null : (s.openFiles.find((f) => f.id === activeFileId) ?? null)
-  )
+  const activeFile = openFiles.find((f) => f.id === activeFileId) ?? null
   const activeWorktreeId = activeFile?.worktreeId
   const canOpenWorkspaceFileBrowser = useAppStore((s) =>
     activeWorktreeId && activeFile
@@ -110,15 +109,12 @@ function EditorPanelInner({
   const [sideBySide, setSideBySide] = useState(settings?.diffDefaultView === 'side-by-side')
   const [prevDiffView, setPrevDiffView] = useState(settings?.diffDefaultView)
 
-  // Why: render-phase setState forces a second commit on every diffDefaultView change — sync in an effect instead.
-  useEffect(() => {
-    if (settings?.diffDefaultView !== prevDiffView) {
-      setPrevDiffView(settings?.diffDefaultView)
-      if (settings?.diffDefaultView !== undefined) {
-        setSideBySide(settings.diffDefaultView === 'side-by-side')
-      }
+  if (settings?.diffDefaultView !== prevDiffView) {
+    setPrevDiffView(settings?.diffDefaultView)
+    if (settings?.diffDefaultView !== undefined) {
+      setSideBySide(settings.diffDefaultView === 'side-by-side')
     }
-  }, [settings?.diffDefaultView, prevDiffView])
+  }
 
   const requestedChangesMode =
     !!activeFile &&
