@@ -170,7 +170,9 @@ export function useAiVaultTranscriptDeepSearch() {
  *  Lives here so AiVaultPanel stays a one-frame component. While a search is
  *  active the panel shows ONLY the matched sessions (a results view), so the
  *  group memo must key off the derived list and a query keystroke must not
- *  rebuild the virtualized groups every render. */
+ *  rebuild the virtualized groups every render. `sessions` is the candidate
+ *  list to search and join — the panel passes the view-filtered (non-query)
+ *  candidates so results respect the active view settings. */
 export function useAiVaultTranscriptDeepSearchPanel(params: {
   query: string
   sessions: readonly AiVaultSession[]

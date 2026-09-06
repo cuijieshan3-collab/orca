@@ -215,34 +215,42 @@ export default function AiVaultPanel(): React.JSX.Element {
     }
   }, [activeProjectKey, activeWorktreePath, scope])
 
-  const filteredSessions = useMemo(
-    () =>
-      filterAiVaultSessions(sessions, {
-        query,
-        agents,
-        scope,
-        sort,
-        activeWorktreePaths,
-        activeProjectKey,
-        sessionProjectById,
-        projectLabelByKey,
-        hideEmptySessions
-      }),
-    [
-      activeProjectKey,
-      activeWorktreePaths,
+  // Deep-search candidates share every non-query view filter (agents, scope,
+  // hide-empty, sort) but bypass the metadata text predicate: transcript-only
+  // hits stay visible, the results view respects the user's view settings, and
+  // the request cap is not consumed by sessions the user has filtered out.
+  const { filteredSessions, candidates } = useMemo(() => {
+    const filters = {
       agents,
-      hideEmptySessions,
-      projectLabelByKey,
-      query,
       scope,
+      sort,
+      activeWorktreePaths,
+      activeProjectKey,
       sessionProjectById,
-      sessions,
-      sort
-    ]
-  )
+      projectLabelByKey,
+      hideEmptySessions
+    }
+    return {
+      filteredSessions: filterAiVaultSessions(sessions, { ...filters, query }),
+      candidates: filterAiVaultSessions(sessions, { ...filters, query: '' })
+    }
+  }, [
+    activeProjectKey,
+    activeWorktreePaths,
+    agents,
+    hideEmptySessions,
+    projectLabelByKey,
+    query,
+    scope,
+    sessionProjectById,
+    sessions,
+    sort
+  ])
 
-  const deepSearch = useAiVaultTranscriptDeepSearchPanel({ query, sessions })
+  const deepSearch = useAiVaultTranscriptDeepSearchPanel({
+    query,
+    sessions: candidates
+  })
   // During a transcript search the panel is a results view: show ONLY the
   // matched sessions, so the global list does not turn into a cluttered mix.
   // Zero hits stay in this view too — falling back to the metadata list would
