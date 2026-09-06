@@ -35,13 +35,16 @@ type DeepSearchState = {
   matchByKey: ReadonlyMap<string, AiVaultTranscriptMatchInfo>
   query: string
   truncated: boolean
+  /** Request keys actually sent in the run that produced this state. */
+  searchedKeys: ReadonlySet<string>
 }
 
 const IDLE_STATE: DeepSearchState = {
   status: 'idle',
   matchByKey: new Map(),
   query: '',
-  truncated: false
+  truncated: false,
+  searchedKeys: new Set()
 }
 const NO_MATCHES: readonly AiVaultSession[] = []
 
@@ -84,11 +87,15 @@ export function useAiVaultTranscriptDeepSearch() {
       const { requests, truncated: requestsTruncated } = localSearchRequests(sessions)
       const runId = runIdRef.current + 1
       runIdRef.current = runId
+      const searchedKeys = new Set(
+        requests.map((request) => aiVaultTranscriptSearchRequestKey(request))
+      )
       setState({
         status: requests.length > 0 ? 'running' : 'done',
         matchByKey: new Map(),
         query,
-        truncated: requestsTruncated
+        truncated: requestsTruncated,
+        searchedKeys
       })
       if (requests.length === 0) {
         return
@@ -123,7 +130,13 @@ export function useAiVaultTranscriptDeepSearch() {
           { matchCount: match.matchCount, snippet: match.snippet, query }
         )
       }
-      setState({ status: 'done', matchByKey, query, truncated: truncated || issues.length > 0 })
+      setState({
+        status: 'done',
+        matchByKey,
+        query,
+        truncated: truncated || issues.length > 0,
+        searchedKeys
+      })
     },
     [localSearchRequests]
   )
@@ -160,6 +173,7 @@ export function useAiVaultTranscriptDeepSearch() {
     deepSearchQuery: state.query,
     deepSearchTruncated: state.truncated,
     deepSearchMatchCount: state.matchByKey.size,
+    searchedKeys: state.searchedKeys,
     runDeepSearch,
     clearDeepSearch,
     matchBySessionId
@@ -181,8 +195,9 @@ export function useAiVaultTranscriptDeepSearchPanel(params: {
   const {
     deepSearchStatus,
     deepSearchQuery,
-    deepSearchTruncated,
-    deepSearchMatchCount,
+    deepSearchTruncated: reportedTruncated,
+    deepSearchMatchCount: reportedMatchCount,
+    searchedKeys,
     runDeepSearch,
     clearDeepSearch,
     matchBySessionId
@@ -215,11 +230,33 @@ export function useAiVaultTranscriptDeepSearchPanel(params: {
         : NO_MATCHES,
     [sessions, transcriptMatchById]
   )
+  // Keep the badge and the visible rows consistent while the results view is
+  // live: the candidate list can change after a search ran (filters broadened
+  // or narrowed, vault refresh), and the frozen search-time count would then
+  // disagree with the rows. Sessions that entered the view unsearched are
+  // flagged as truncated instead of passing for a complete result.
+  const deepSearchTruncated = useMemo(() => {
+    if (deepSearchStatus !== 'done' || deepSearchQuery !== query) {
+      return reportedTruncated
+    }
+    return (
+      reportedTruncated ||
+      sessions.some(
+        (session) =>
+          canUseLocalAiVaultSessionPathActions(session.executionHostId) &&
+          !searchedKeys.has(
+            aiVaultTranscriptSearchRequestKey({ agent: session.agent, filePath: session.filePath })
+          )
+      )
+    )
+  }, [deepSearchQuery, deepSearchStatus, query, reportedTruncated, searchedKeys, sessions])
   return {
     deepSearchStatus,
     deepSearchQuery,
     deepSearchTruncated,
-    deepSearchMatchCount,
+    // Count the matches joined to the CURRENT candidates, not the frozen
+    // search-time total, so the badge always agrees with the visible rows.
+    deepSearchMatchCount: transcriptMatchById ? transcriptMatchById.size : reportedMatchCount,
     matchedSessions,
     transcriptMatchById,
     onDeepSearch,
